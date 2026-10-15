@@ -1,117 +1,76 @@
-"""
-mongodb_client.py
------------------
-Handles all MongoDB database operations for the Bank Churn Prediction app.
-Database  : bank_churn_db
-Collection: prediction_history
-"""
-
-import os
-from datetime import datetime
 from pymongo import MongoClient, DESCENDING
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from bson.objectid import ObjectId
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _get_uri() -> str:
-    """
-    Return the MongoDB connection URI.
-    Priority:
-      1. Streamlit secrets  (st.secrets["MONGO_URI"])
-      2. Environment variable MONGO_URI
-      3. Default localhost URI
-    """
-    try:
-        import streamlit as st
-        uri = st.secrets.get("MONGO_URI", None)
-        if uri:
-            return uri
-    except Exception:
-        pass
-
-    uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
-    return uri
+# Connect to MongoDB
+client = MongoClient("mongodb://localhost:27017/")
+db = client["bank_churn_db"]
+collection = db["prediction_history"]
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-def get_db():
-    """
-    Connect to MongoDB and return the database handle (bank_churn_db).
-
-    Returns:
-        pymongo.database.Database  — on success
-        None                       — on connection failure (caller handles)
-    """
-    try:
-        uri = _get_uri()
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        # Trigger connection check
-        client.admin.command("ping")
-        db = client["bank_churn_db"]
-        return db
-    except (ConnectionFailure, ServerSelectionTimeoutError) as exc:
-        print(f"[mongodb_client] Connection failed: {exc}")
-        return None
+# Create
+def save_prediction(record):
+    return collection.insert_one(record)
 
 
-def save_prediction(record: dict) -> bool:
-    """
-    Store a prediction record in the prediction_history collection.
+# Read
+def get_prediction_history(name_filter=""):
+    query = {}
 
-    Expected keys in record:
-        user_name, credit_score, geography, gender, age, tenure,
-        balance, num_of_products, has_cr_card, is_active_member,
-        estimated_salary, prediction_label, churn_probability,
-        model_name, timestamp (datetime)
+    if name_filter:
+        query["user_name"] = {"$regex": name_filter, "$options": "i"}
 
-    Returns:
-        True on success, False on failure.
-    """
-    db = get_db()
-    if db is None:
-        return False
-
-    try:
-        collection = db["prediction_history"]
-        collection.insert_one(record)
-        return True
-    except Exception as exc:
-        print(f"[mongodb_client] save_prediction error: {exc}")
-        return False
+    return list(collection.find(query).sort("timestamp", DESCENDING))
 
 
-def get_prediction_history(name_filter: str = "") -> list:
-    """
-    Retrieve prediction history from MongoDB.
+# Delete one prediction
+# Delete one prediction
+def delete_prediction(doc_id):
+    from bson.objectid import ObjectId
 
-    Args:
-        name_filter: Optional partial/full name to filter results.
-                     Uses case-insensitive regex match.
-                     If empty string, all records are returned.
+    result = collection.delete_one({"_id": ObjectId(doc_id)})
+    return result.deleted_count > 0
+    
+# Delete all predictions
+def clear_all_predictions():
+    return collection.delete_many({}).deleted_count
 
-    Returns:
-        List of prediction document dicts, sorted newest-first.
-        Returns empty list on connection failure.
-    """
-    db = get_db()
-    if db is None:
-        return []
 
-    try:
-        collection = db["prediction_history"]
-        query = {}
-        if name_filter.strip():
-            query["user_name"] = {
-                "$regex": name_filter.strip(),
-                "$options": "i"   # case-insensitive
-            }
-        cursor = collection.find(query).sort("timestamp", DESCENDING)
-        return list(cursor)
-    except Exception as exc:
-        print(f"[mongodb_client] get_prediction_history error: {exc}")
-        return []
+# Analytics
+def get_analytics_summary():
+    total = collection.count_documents({})
+
+    if total == 0:
+        return {"total_count": 0, "prediction_breakdown": [],
+                "geography_breakdown": [], "model_breakdown": []}
+
+    predictions = list(collection.aggregate([
+        {"$group": {
+            "_id": "$prediction_label",
+            "count": {"$sum": 1},
+            "avg_probability": {"$avg": "$churn_probability"}
+        }}
+    ]))
+
+    geography = list(collection.aggregate([
+        {"$group": {
+            "_id": "$geography",
+            "total": {"$sum": 1},
+            "avg_balance": {"$avg": "$balance"}
+        }},
+        {"$sort": {"total": -1}}
+    ]))
+
+    models = list(collection.aggregate([
+        {"$group": {
+            "_id": "$model_name",
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}}
+    ]))
+
+    return {
+        "total_count": total,
+        "prediction_breakdown": predictions,
+        "geography_breakdown": geography,
+        "model_breakdown": models
+    }
