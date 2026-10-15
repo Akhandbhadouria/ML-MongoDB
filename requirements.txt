@@ -1,0 +1,5 @@
+streamlit
+pymongo
+pandas
+scikit-learn
+joblib
