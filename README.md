@@ -1,39 +1,21 @@
 # 🏦 Bank Customer Churn Prediction
 
-A simple, end-to-end **Bank Customer Churn Prediction** application built with
-**Streamlit**, **MongoDB (PyMongo)**, and a **Random Forest** machine-learning model.
+A **minimal, end-to-end** ML + MongoDB project that predicts whether a bank customer will churn.  
+Built with **Python**, **Scikit-learn**, and **PyMongo** — no Streamlit, no extra pages.
 
 ---
 
-## 📌 Project Overview
-
-| Item | Detail |
-|------|--------|
-| **Goal** | Predict whether a bank customer will churn (leave) |
-| **ML Model** | Random Forest Classifier (scikit-learn) |
-| **Database** | MongoDB — `bank_churn_db.prediction_history` |
-| **Frontend** | Streamlit (2 pages) |
-| **Serialization** | Joblib (`model.pkl`) |
-
----
-
-## 📁 Project Structure
+## 📁 Folder Structure
 
 ```
 bank-churn-mongodb/
-├── app.py                         # Page 1 — Churn Prediction form
-├── pages/
-│   └── 1_Prediction_History.py   # Page 2 — History with name filter
-├── mongodb_client.py              # MongoDB CRUD operations
-├── train_model.py                 # Model training & evaluation
-├── model.pkl                      # Saved trained pipeline (auto-generated)
-├── Bank_Churn.csv                 # Source dataset
-├── requirements.txt               # Python dependencies
-├── .gitignore                     # Files excluded from Git
-├── .streamlit/
-│   ├── secrets.toml               # MongoDB URI (not committed to Git)
-│   └── secrets.toml.example       # Example configuration
-└── README.md                      # This file
+├── Bank_Churn.csv       # Source dataset (10,000 customers)
+├── train_model.py       # Preprocess + train Random Forest → saves model.pkl
+├── main.py              # predict_churn() + all MongoDB operations demo
+├── model.pkl            # Saved sklearn pipeline (auto-generated)
+├── requirements.txt     # Python dependencies
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -41,130 +23,103 @@ bank-churn-mongodb/
 ## ⚙️ Setup Instructions
 
 ### 1. Prerequisites
-
 - Python 3.9+
-- MongoDB installed locally **or** a MongoDB Atlas account
+- MongoDB running locally **or** a [MongoDB Atlas](https://www.mongodb.com/atlas) account
 
-### 2. Clone / Open the Project
-
-```bash
-cd bank-churn-mongodb
-```
-
-### 3. Create a Virtual Environment (Recommended)
-
+### 2. Create & activate a virtual environment
 ```bash
 python -m venv venv
 source venv/bin/activate        # macOS / Linux
 venv\Scripts\activate           # Windows
 ```
 
-### 4. Install Dependencies
-
+### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Configure MongoDB
-
-Copy the example secrets file and update the URI:
-
+### 4. Start MongoDB (local)
 ```bash
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-```
-
-Edit `.streamlit/secrets.toml`:
-
-```toml
-# Local MongoDB
-MONGO_URI = "mongodb://localhost:27017/"
-
-# MongoDB Atlas (replace with your actual URI)
-# MONGO_URI = "mongodb+srv://<user>:<password>@<cluster>.mongodb.net/"
-```
-
-> **Never commit `secrets.toml` to Git.** It is already listed in `.gitignore`.
-
-### 6. Start MongoDB (Local)
-
-```bash
-mongod --dbpath /usr/local/var/mongodb   # macOS with Homebrew
+brew services start mongodb-community   # macOS (Homebrew)
 # or
-brew services start mongodb-community    # macOS service
+mongod --dbpath /usr/local/var/mongodb
 ```
 
-### 7. Train the Model
+> To use **MongoDB Atlas** instead, set the `MONGO_URI` environment variable:
+> ```bash
+> export MONGO_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/"
+> ```
 
-Run this **once** before starting the Streamlit app:
-
+### 5. Train the model
 ```bash
 python train_model.py
 ```
+This reads `Bank_Churn.csv`, trains a Random Forest pipeline, and saves `model.pkl`.
 
-This creates `model.pkl` in the project directory.
-
-### 8. Run the Streamlit App
-
+### 6. Run the demo
 ```bash
-streamlit run app.py
+python main.py
 ```
-
-Open your browser at: **http://localhost:8501**
-
----
-
-## 🖥️ Application Pages
-
-### Page 1 — Customer Churn Prediction (`app.py`)
-
-Fill in the customer form:
-
-| Field | Type |
-|-------|------|
-| Your Name | Text |
-| Credit Score | Number (300–850) |
-| Geography | Dropdown: France / Germany / Spain |
-| Gender | Dropdown: Male / Female |
-| Age | Number (18–100) |
-| Tenure | Number (0–10 years) |
-| Balance | Number |
-| Number of Products | Number (1–4) |
-| Has Credit Card | Yes / No |
-| Active Member | Yes / No |
-| Estimated Salary | Number |
-
-Click **Predict Churn** → the app:
-1. Passes features to the trained Random Forest pipeline.
-2. Displays **"Likely to Churn"** or **"Likely to Stay"** with probability.
-3. Saves the record to MongoDB (`bank_churn_db.prediction_history`).
+This loads the model, makes 3 sample predictions, stores them in MongoDB, then demonstrates every MongoDB operation.
 
 ---
 
-### Page 2 — Prediction History (`pages/1_Prediction_History.py`)
+## 🤖 Machine Learning
 
-- Fetches all records **directly from MongoDB** (not from session state).
-- Provides a **name-based filter** using a case-insensitive regex query.
-- Displays: Name · Result · Probability · Model · Timestamp.
-- Expandable card shows all input features.
-- Records are sorted **newest-first**.
+### Dataset
+| Property | Value |
+|----------|-------|
+| File | `Bank_Churn.csv` |
+| Rows | 10,000 customers |
+| Target | `Exited` (1 = Churned, 0 = Stayed) |
+| Churn rate | ~20.4% |
+
+### Features Used
+| Feature | Type |
+|---------|------|
+| CreditScore | Numeric |
+| Geography | Categorical (France / Germany / Spain) |
+| Gender | Categorical (Male / Female) |
+| Age | Numeric |
+| Tenure | Numeric |
+| Balance | Numeric |
+| NumOfProducts | Numeric |
+| HasCrCard | Binary (1/0) |
+| IsActiveMember | Binary (1/0) |
+| EstimatedSalary | Numeric |
+
+### Preprocessing (inside the pipeline)
+| Step | Transformer |
+|------|-------------|
+| Numeric features | `StandardScaler` |
+| Categorical features | `OneHotEncoder(handle_unknown="ignore")` |
+
+> Preprocessing is embedded in an sklearn `Pipeline`, so the **exact same transformations** are applied during both training and prediction — no data leakage possible.
+
+### Model & Evaluation
+| Metric | Value |
+|--------|-------|
+| Algorithm | `RandomForestClassifier(n_estimators=100, random_state=42)` |
+| Accuracy | **86.00%** |
+| Precision (Churn) | 0.77 |
+| Recall (Churn) | 0.44 |
+| F1 (Churn) | 0.56 |
 
 ---
 
 ## 🗄️ MongoDB Integration
 
-### Database & Collection
-
+### Database
 | Setting | Value |
 |---------|-------|
 | Database | `bank_churn_db` |
 | Collection | `prediction_history` |
 
 ### Document Schema
-
 ```json
 {
   "_id":               "ObjectId (auto)",
-  "user_name":         "John Smith",
+  "customer_name":     "Alice",
   "credit_score":      650,
   "geography":         "France",
   "gender":            "Male",
@@ -175,144 +130,134 @@ Click **Predict Churn** → the app:
   "has_cr_card":       1,
   "is_active_member":  1,
   "estimated_salary":  80000.0,
+  "prediction":        0,
   "prediction_label":  "Likely to Stay",
   "churn_probability": 0.12,
   "model_name":        "Random Forest",
-  "timestamp":         "2026-10-15T07:30:00Z"
+  "timestamp":         "2026-10-29T07:47:00Z"
 }
 ```
 
-### `mongodb_client.py` Functions
+### Operations Demonstrated in `main.py`
 
-| Function | Purpose |
-|----------|---------|
-| `get_db()` | Connects to MongoDB, returns database handle |
-| `save_prediction(record)` | Inserts one prediction document |
-| `get_prediction_history(name_filter)` | Retrieves records, optionally filtered by name (regex, case-insensitive), sorted newest-first |
-
----
-
-## 🤖 Machine Learning Details
-
-### Dataset
-
-- **Source**: Bank_Churn.csv  
-- **Rows**: 10,000 customers  
-- **Target**: `Exited` (1 = Churned, 0 = Stayed)  
-- **Class balance**: 79.6% Stay / 20.4% Churn
-
-### Features Used
-
-| Feature | Type |
-|---------|------|
-| CreditScore | Numeric |
-| Geography | Categorical |
-| Gender | Categorical |
-| Age | Numeric |
-| Tenure | Numeric |
-| Balance | Numeric |
-| NumOfProducts | Numeric |
-| HasCrCard | Numeric (binary) |
-| IsActiveMember | Numeric (binary) |
-| EstimatedSalary | Numeric |
-
-### Preprocessing
-
-| Step | Details |
-|------|---------|
-| Numeric features | `StandardScaler` |
-| Categorical features | `OneHotEncoder` (handle\_unknown="ignore") |
-
-> Preprocessing is embedded inside an sklearn `Pipeline`, ensuring the **same
-> transformations** are applied during both training and inference.
-
-### Model
-
-- **Algorithm**: `RandomForestClassifier(random_state=42)`
-- **Default parameters** (no hyperparameter tuning)
-- **Train/Test split**: 80% / 20% stratified
+| Operation | Function | PyMongo Method |
+|-----------|----------|----------------|
+| Insert record | `predict_churn()` | `insert_one()` |
+| Get all records | `get_all_predictions()` | `find()` + `sort()` |
+| Get one record | `get_prediction_by_id()` | `find_one()` |
+| Update a record | `update_prediction_note()` | `update_one()` |
+| Delete a record | `delete_prediction()` | `delete_one()` |
+| Count records | `count_predictions()` | `count_documents()` |
+| Filter records | `get_churn_predictions()` | `find({ filter })` |
+| Analytics | `get_analytics()` | `aggregate()` |
 
 ---
 
-## 📊 Evaluation Metrics
+## 📋 Sample MongoDB Shell Queries
 
-| Metric | Value |
-|--------|-------|
-| **Accuracy** | **86.00%** |
-| **R² Score** | 0.1363 |
-| **MAE** | 0.1400 |
-| **Precision** | 0.7702 |
-| **Recall** | 0.4447 |
-| **F1 Score** | 0.5639 |
+Run these in **mongosh** (or MongoDB Compass) after running `python main.py`:
 
-### Classification Report
+```javascript
+// Select the database
+use bank_churn_db
 
+// ── insertOne ──────────────────────────────────────────────────────────────
+// (done automatically by predict_churn() in main.py)
+
+// ── find all records ───────────────────────────────────────────────────────
+db.prediction_history.find()
+
+// ── find with filter: only churn predictions ───────────────────────────────
+db.prediction_history.find({ prediction_label: "Likely to Churn" })
+
+// ── find with filter + projection (show only name, label, probability) ─────
+db.prediction_history.find(
+  { prediction_label: "Likely to Churn" },
+  { customer_name: 1, prediction_label: 1, churn_probability: 1 }
+)
+
+// ── find with regex filter (case-insensitive name search) ──────────────────
+db.prediction_history.find({ customer_name: { $regex: "ali", $options: "i" } })
+
+// ── findOne ────────────────────────────────────────────────────────────────
+db.prediction_history.findOne({ geography: "Germany" })
+
+// ── sorting: highest churn probability first ───────────────────────────────
+db.prediction_history.find().sort({ churn_probability: -1 })
+
+// ── updateOne: add analyst note ────────────────────────────────────────────
+db.prediction_history.updateOne(
+  { customer_name: "Bob" },
+  { $set: { note: "Needs retention offer" } }
+)
+
+// ── countDocuments ─────────────────────────────────────────────────────────
+db.prediction_history.countDocuments()                              // all
+db.prediction_history.countDocuments({ prediction_label: "Likely to Churn" })  // churn only
+
+// ── aggregation: count & avg probability per label ─────────────────────────
+db.prediction_history.aggregate([
+  {
+    $group: {
+      _id: "$prediction_label",
+      count: { $sum: 1 },
+      avg_probability: { $avg: "$churn_probability" }
+    }
+  }
+])
+
+// ── aggregation: breakdown by geography ────────────────────────────────────
+db.prediction_history.aggregate([
+  {
+    $group: {
+      _id: "$geography",
+      total: { $sum: 1 },
+      avg_balance: { $avg: "$balance" },
+      churn_count: { $sum: "$prediction" }
+    }
+  },
+  { $sort: { total: -1 } }
+])
+
+// ── deleteOne ──────────────────────────────────────────────────────────────
+db.prediction_history.deleteOne({ customer_name: "Carol" })
 ```
-              precision    recall  f1-score   support
-   Stay (0)       0.87      0.97      0.92      1593
-  Churn (1)       0.77      0.44      0.56       407
-    accuracy                           0.86      2000
-   macro avg       0.82      0.71      0.74      2000
-weighted avg       0.85      0.86      0.84      2000
-```
-
-### Confusion Matrix
-
-|  | Predicted Stay | Predicted Churn |
-|--|---------------|----------------|
-| **Actual Stay** | TN = 1539 | FP = 54 |
-| **Actual Churn** | FN = 226 | TP = 181 |
 
 ---
 
 ## 📦 Dependencies
 
 ```
-streamlit
-pymongo
 pandas
 scikit-learn
+pymongo
 joblib
 ```
 
 ---
 
-## 🔄 How the Application Works (Flow)
+## 🔄 How It Works
 
 ```
-User fills form (Page 1)
-         │
-         ▼
-   app.py collects inputs
-         │
-         ▼
-   pandas DataFrame (same column order as training)
-         │
-         ▼
-   pipeline.predict() + pipeline.predict_proba()
-         │
-         ├──► Display result on screen
-         │
-         └──► mongodb_client.save_prediction(record)
-                       │
-                       ▼
-              MongoDB: bank_churn_db.prediction_history
-
-
-User opens Page 2
-         │
-         ▼
-   User types a name filter (optional)
-         │
-         ▼
-   mongodb_client.get_prediction_history(name_filter)
-         │
-         ▼
-   PyMongo query: {"user_name": {"$regex": ..., "$options": "i"}}
-   .sort("timestamp", DESCENDING)
-         │
-         ▼
-   Display records (newest first) with expandable details
+Bank_Churn.csv
+      │
+      ▼
+train_model.py
+  ├── Drop CustomerId, Surname
+  ├── StandardScaler  (numeric)
+  ├── OneHotEncoder   (categorical)
+  ├── RandomForestClassifier
+  └── Saves → model.pkl
+      │
+      ▼
+main.py
+  ├── Load model.pkl
+  ├── Connect to MongoDB
+  └── predict_churn(customer details)
+        ├── Build DataFrame
+        ├── pipeline.predict() + predict_proba()
+        ├── insertOne → MongoDB
+        └── Return { label, probability, inserted_id }
 ```
 
 ---
@@ -322,6 +267,6 @@ User opens Page 2
 | Problem | Solution |
 |---------|----------|
 | `model.pkl not found` | Run `python train_model.py` first |
-| `MongoDB connection failed` | Ensure `mongod` is running; check `secrets.toml` URI |
+| `Cannot connect to MongoDB` | Start MongoDB with `brew services start mongodb-community` |
 | `ModuleNotFoundError` | Run `pip install -r requirements.txt` |
-| App won't start | Confirm you are inside the `bank-churn-mongodb/` directory |
+| `Bank_Churn.csv not found` | Make sure the CSV is in the same directory as `train_model.py` |

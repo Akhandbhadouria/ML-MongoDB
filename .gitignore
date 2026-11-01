@@ -1,31 +1,9 @@
-# Python bytecode & caches
+venv/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.Python
-
-# Virtual environments
-venv/
-.venv/
-env/
-
-# Trained model file (large binary)
 model.pkl
-
-# Streamlit secrets (contain credentials — never commit!)
-.streamlit/secrets.toml
-
-# Environment files
-.env
-*.env
-
-# macOS metadata
 .DS_Store
-
-# IDE settings
-.idea/
-.vscode/
-
-# Jupyter notebooks checkpoints
-.ipynb_checkpoints/
+.env
+*.ipynb
+*.ipynb_checkpoints/

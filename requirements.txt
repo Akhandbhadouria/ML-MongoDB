@@ -1,7 +1,4 @@
-streamlit
-pymongo
 pandas
 scikit-learn
+pymongo
 joblib
-xgboost
-lightgbm
